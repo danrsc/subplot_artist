@@ -525,10 +525,6 @@ class SubplotArtistGrid(object):
         # render function, where we are the top level grid
         row_heights, column_widths = self.calculate_row_heights_and_column_widths()
 
-        print(row_heights, column_widths)
-        print(self.height, self.width)
-        print(self.hspace, self.wspace)
-
         plt.ioff()
         fig = plt.figure(figsize=(self.width, self.height), dpi=dpi)
         grid = gridspec.GridSpec(
