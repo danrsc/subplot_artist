@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from numbers import Number, Integral
 import numpy
 from matplotlib import rcParams
@@ -600,7 +604,7 @@ class SubplotArtistBase(object):
         return self._subplot_artist_grid
 
     def render(self, axes):
-        axes.set_axis_bgcolor('red')
+        axes.set_facecolor('red')
 
 
 class SubplotArtist(SubplotArtistBase):
@@ -655,6 +659,17 @@ def get_margined_limits(data_to_limit, min_margin=None, max_margin=None):
 
 def matshow(ax, data, aspect='auto', **kwargs):
     return ax.matshow(data, aspect=aspect, **kwargs)
+
+
+class MatrixArtist(SubplotArtist):
+
+    def __init__(self, matrix, width=None, height=None, colorbar_artist=None, **render_kwargs):
+        super(MatrixArtist, self).__init__(
+            width=width, height=height, colorbar_artist=colorbar_artist, render_kwargs=render_kwargs)
+        self.matrix = matrix
+
+    def render(self, axes):
+        matshow(axes, self.matrix, **self.render_kwargs)
 
 
 render_subplot_artists = SubplotArtistGrid.render_artists
