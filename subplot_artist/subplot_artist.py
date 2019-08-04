@@ -18,7 +18,8 @@ __all__ = [
     'SubplotArtist3D',
     'get_margined_limits',
     'render_subplot_artists',
-    'matshow']
+    'matshow',
+    'bar3d_from_heatmap']
 
 
 class _SubplotArtistSpec(object):
@@ -659,6 +660,20 @@ def get_margined_limits(data_to_limit, min_margin=None, max_margin=None):
 
 def matshow(ax, data, aspect='auto', **kwargs):
     return ax.matshow(data, aspect=aspect, **kwargs)
+
+
+def bar3d_from_heatmap(ax, heatmap, dx=1, dy=1, **kwargs):
+    x = numpy.arange(heatmap.shape[0])
+    y = numpy.arange(heatmap.shape[1])
+    x, y = numpy.meshgrid(x, y)
+    return ax.bar3d(
+        numpy.ravel(x),
+        numpy.ravel(y),
+        0,
+        dx=dx,
+        dy=dy,
+        dz=numpy.ravel(heatmap),
+        **kwargs)
 
 
 class MatrixArtist(SubplotArtist):
