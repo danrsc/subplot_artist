@@ -1,8 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-from numbers import Number, Integral
+from numbers import Integral
 import numpy
 from matplotlib import rcParams
 from matplotlib import gridspec
@@ -18,6 +14,7 @@ __all__ = [
     'SubplotArtist3D',
     'get_margined_limits',
     'render_subplot_artists',
+    'make_figure',
     'matshow',
     'bar3d_from_heatmap']
 
@@ -82,6 +79,37 @@ class _RemoveChoice(object):
     all = 'all'
 
 
+class SubplotFigure:
+
+    def __init__(self, figure, grid):
+        self.figure = figure
+        self.grid = grid
+
+    def show(
+            self,
+            output_figure_path=None,
+            is_tight_layout=False,
+            tight_layout_pad=1.08,
+            tight_layout_h_pad=None,
+            tight_layout_w_pad=None,
+            should_close_figure=True):
+
+        from matplotlib import pyplot as plt
+
+        if is_tight_layout:
+            self.grid.tight_layout(
+                self.figure, pad=tight_layout_pad, h_pad=tight_layout_h_pad, w_pad=tight_layout_w_pad)
+        if output_figure_path is None:
+            # this will block until the figures are closed
+            plt.show()
+        else:
+            self.figure.savefig(output_figure_path, bbox_inches='tight')
+            if should_close_figure:
+                plt.close(self.figure)
+        if should_close_figure:
+            del self.figure
+
+
 class SubplotArtistGrid(object):
 
     @staticmethod
@@ -106,6 +134,28 @@ class SubplotArtistGrid(object):
             tight_layout_h_pad=tight_layout_h_pad,
             tight_layout_w_pad=tight_layout_w_pad,
             dpi=dpi)
+
+    @staticmethod
+    def artists_figure(
+            artists,
+            num_rows=None,
+            num_columns=None,
+            wspace=None,
+            hspace=None,
+            dpi=None,
+            keyed_axes=False):
+        grid = SubplotArtistGrid(
+            iterable=artists, wspace=wspace, hspace=hspace, num_rows=num_rows, num_columns=num_columns)
+        fig, axes = grid.make_figure(dpi)
+        if keyed_axes:
+            return fig, axes
+        flat_axes = list()
+        if isinstance(artists, (list, tuple, dict)):
+            for key in artists:
+                flat_axes.append(axes[key])
+            return fig, flat_axes
+        # artists is one item
+        return fig, axes[artists]
 
     def __init__(
             self,
@@ -523,11 +573,13 @@ class SubplotArtistGrid(object):
             tight_layout_w_pad=None,
             dpi=None):
 
+        fig, axes = self.make_figure(dpi)
+        self.render_subplots(axes)
+        fig.show(output_figure_path, is_tight_layout, tight_layout_pad, tight_layout_h_pad, tight_layout_w_pad)
+
+    def make_figure(self, dpi=None):
         from matplotlib import pyplot as plt
 
-        # from the way tight_layout / GridSpec work together, it seems like it might be a bad idea
-        # to try to use tight_layout to adjust a nested GridSpec, so we only allow tight_layout in the
-        # render function, where we are the top level grid
         row_heights, column_widths = self.calculate_row_heights_and_column_widths()
 
         plt.ioff()
@@ -539,25 +591,23 @@ class SubplotArtistGrid(object):
             height_ratios=row_heights,
             wspace=self.wspace,
             hspace=self.hspace)
+
+        axes = dict()
         for artist_spec in self._subplot_artist_specs:
             subplot_spec = grid[
                 artist_spec.index_grid_top:(artist_spec.index_grid_top + artist_spec.num_rows),
                 artist_spec.index_grid_left:(artist_spec.index_grid_left + artist_spec.num_columns)]
-            artist_spec.subplot_artist.render_subplots(fig, subplot_spec)
-        if is_tight_layout:
-            grid.tight_layout(
-                fig, pad=tight_layout_pad, h_pad=tight_layout_h_pad, w_pad=tight_layout_w_pad)
-        if output_figure_path is None:
-            # this will block until the figures are closed
-            plt.show()
-        else:
-            fig.savefig(output_figure_path, bbox_inches='tight')
-            plt.close(fig)
-        del fig
+            artist_spec.subplot_artist.add_axes(fig, subplot_spec, axes)
 
-    def render_subplots(self, fig, subplot_spec):
+        return SubplotFigure(fig, grid), axes
+
+    def add_axes(self, fig, subplot_spec, axes_result):
         for artist, subplot_spec_for_artist in self.prepare_subplots(subplot_spec):
-            artist.render_subplots(fig, subplot_spec_for_artist)
+            artist.add_axes(fig, subplot_spec_for_artist, axes_result)
+
+    def render_subplots(self, axes):
+        for artist in self._subplot_artist_specs:
+            artist.render_subplots(axes)
 
 
 class SubplotArtistBase(object):
@@ -582,12 +632,16 @@ class SubplotArtistBase(object):
         self._width = width
         self._height = height
 
-    def render_subplots(self, fig, subplot_spec):
+    def add_axes(self, fig, subplot_spec, axes_result):
         if self._subplot_artist_grid is not None:
-            self._subplot_artist_grid.render_subplots(fig, subplot_spec)
+            return self._subplot_artist_grid.add_axes(fig, subplot_spec, axes_result)
+        axes_result[self] = self._add_subplot(fig, subplot_spec)
+
+    def render_subplots(self, axes):
+        if self._subplot_artist_grid is not None:
+            self._subplot_artist_grid.render_subplots(axes)
         else:
-            axes = self._add_subplot(fig, subplot_spec)
-            self.render(axes)
+            self.render(axes[self])
 
     def _add_subplot(self, fig, subplot_spec):
         return fig.add_subplot(subplot_spec)
@@ -605,7 +659,11 @@ class SubplotArtistBase(object):
         return self._subplot_artist_grid
 
     def render(self, axes):
-        axes.set_facecolor('red')
+        if isinstance(axes, (dict, list, tuple)):
+            for ax in axes:
+                ax.set_facecolor('red')
+        else:
+            axes.set_facecolor('red')
 
 
 class SubplotArtist(SubplotArtistBase):
@@ -688,3 +746,4 @@ class MatrixArtist(SubplotArtist):
 
 
 render_subplot_artists = SubplotArtistGrid.render_artists
+make_figure = SubplotArtistGrid.artists_figure
