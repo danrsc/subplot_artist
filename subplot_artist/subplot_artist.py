@@ -606,8 +606,8 @@ class SubplotArtistGrid(object):
             artist.add_axes(fig, subplot_spec_for_artist, axes_result)
 
     def render_subplots(self, axes):
-        for artist in self._subplot_artist_specs:
-            artist.render_subplots(axes)
+        for artist_spec in self._subplot_artist_specs:
+            artist_spec.subplot_artist.render_subplots(axes)
 
 
 class SubplotArtistBase(object):
